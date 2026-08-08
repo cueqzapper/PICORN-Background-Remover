@@ -1,0 +1,10 @@
+/dist/
+/node_modules/
+/public/vendor/
+*.log
+.DS_Store
+Thumbs.db
+/.verification/
+/.chrome-smoke-*/
+/portrait-result*.png
+/demo-page.png

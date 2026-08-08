@@ -1,0 +1,22 @@
+{
+  "name": "picorn-background-remover",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A tiny client-side background remover with smart alpha-matte refinement.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "prebuild": "node scripts/copy-ort-assets.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test",
+    "check": "node --check src/main.js && node --check src/browser-runtime.js && node --check src/interactive-matting.js"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.27.0"
+  },
+  "devDependencies": {
+    "vite": "^8.2.1"
+  }
+}

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080a0d">
+  <meta name="description" content="PICORN Remove Background runs a 1.35 MB image matting model entirely in your browser, with local smart-brush refinement.">
+  <meta property="og:title" content="PICORN Remove Background">
+  <meta property="og:description" content="Background remover in the Browser/Client side. No upload. WebGPU and WASM.">
+  <meta property="og:type" content="website">
+  <title>PICORN Remove Background — Client-side image matting</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%236de3bd'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='36' font-family='Arial' font-weight='700' fill='%23091312'%3EP%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles-base.css">
+  <link rel="stylesheet" href="styles-controls.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top"><span class="brand-mark">P</span><span>PICORN <b>REMOVE BACKGROUND</b></span></a>
+    <div class="runtime-pill ready" id="runtime-pill"><i></i><span id="runtime-text">Browser ready · nothing uploaded</span></div>
+    <nav>
+      <a href="#how-it-works">How it works</a>
+      <a href="https://github.com/cueqzapper/PICORN-Background-Remover" rel="noreferrer">GitHub ↗</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero alpha-hero">
+      <div>
+        <p class="eyebrow">BACKGROUND REMOVER IN THE BROWSER/CLIENT SIDE.</p>
+        <h1>Drop the background.<br><em>Keep the edge.</em></h1>
+        <p class="hero-copy">PICORN runs a 1.35 MB alpha-matting model on your device. No image upload, no API key, no waiting for a server. Correct tricky areas with one green or red stroke.</p>
+        <div class="hero-badges" aria-label="Product facts">
+          <span><b>1.35 MB</b> model</span>
+          <span><b>313k</b> parameters</span>
+          <span><b>100%</b> local</span>
+        </div>
+      </div>
+      <div class="alpha-upload">
+        <label id="dropzone" for="file-input">
+          <input id="file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+          <span>↥</span><strong>Drop an image here</strong><small>or choose PNG, JPG or WebP</small>
+        </label>
+        <p>Images stay in this browser tab.</p>
+      </div>
+    </section>
+
+    <section class="alpha-examples" aria-label="Demo images">
+      <span>TRY A DEMO</span>
+      <div>
+        <button data-example="demo/portrait-curls.webp"><img src="demo/portrait-curls.webp" alt="Portrait with natural curly hair"><b>Curly hair</b></button>
+        <button data-example="demo/shaggy-dog.webp"><img src="demo/shaggy-dog.webp" alt="Shaggy dog by a lake"><b>Fine fur</b></button>
+        <button data-example="demo/trail-shoe.webp"><img src="demo/trail-shoe.webp" alt="Burnt-orange trail shoe with woven laces"><b>Product edge</b></button>
+      </div>
+    </section>
+
+    <section class="alpha-toolbar">
+      <label>Device profile<select id="inference-size"><option value="320">Turbo · 320</option><option value="384" selected>Balanced · 384</option><option value="512">Quality · 512</option></select></label>
+      <label>Alpha contrast <output id="contrast-output">1.00</output><input id="alpha-contrast" type="range" min="40" max="220" value="100"></label>
+      <label>Edge <output id="edge-output">0</output><input id="edge-shift" type="range" min="-25" max="25" value="0"></label>
+      <button id="rerun-button" disabled>Original mask</button>
+    </section>
+
+    <section class="alpha-empty" id="empty-result">
+      <div class="empty-orbit"><i></i><i></i><i></i></div>
+      <h2>Give it a difficult edge.</h2>
+      <p>Hair, fur, feathers, leaves and thin objects show what the alpha matte is doing.</p>
+    </section>
+
+    <section class="alpha-result" id="result-content" hidden>
+      <header>
+        <div><span>CURRENT IMAGE</span><h2 id="result-name">–</h2><p id="result-meta">–</p></div>
+        <div class="alpha-stats"><span>Model <b id="base-time">–</b></span><span>Profile <b id="detail-time">–</b></span><span>Parameters <b id="tile-count">–</b></span></div>
+      </header>
+
+      <div class="background-picker">
+        <span>EDGE CHECK</span>
+        <button class="active checker" data-background="checker" title="Transparent checkerboard" aria-label="Transparent checkerboard"></button>
+        <button class="white" data-background="#ffffff" title="White" aria-label="White"></button>
+        <button class="black" data-background="#050505" title="Black" aria-label="Black"></button>
+        <button class="cyan" data-background="#24d7c2" title="Turquoise" aria-label="Turquoise"></button>
+        <button class="pink" data-background="#ed4c8c" title="Pink" aria-label="Pink"></button>
+        <button class="gradient" data-background="gradient" title="Gradient" aria-label="Gradient"></button>
+        <label class="custom-colour" title="Custom color"><input id="custom-colour" type="color" value="#7467ff" aria-label="Custom background color"></label>
+      </div>
+
+      <section class="mask-refiner" aria-labelledby="refiner-title">
+        <header>
+          <div><span>SMART REFINE</span><h3 id="refiner-title">Paint roughly over the wrong area.</h3><p>Green keeps an area. Red removes it. PICORN grows your hint through the connected region, then rebuilds the soft alpha along the visible edge.</p></div>
+          <div class="refiner-actions">
+            <button class="brush-mode active keep" data-brush-mode="keep"><i></i>Keep</button>
+            <button class="brush-mode remove" data-brush-mode="remove"><i></i>Remove</button>
+            <label>Brush <output id="brush-size-output">36 px</output><input id="brush-size" type="range" min="8" max="120" value="36"></label>
+            <button id="undo-stroke" disabled>Undo</button>
+            <button id="clear-strokes" disabled>Reset</button>
+            <span class="auto-refine-status" id="auto-refine-status"><i></i>Edge matting ready</span>
+          </div>
+        </header>
+        <div class="refiner-stage" id="refiner-stage">
+          <canvas id="refine-preview-canvas"></canvas>
+          <canvas id="refine-strokes-canvas" aria-label="Correct the mask with a green or red brush"></canvas>
+          <div class="refiner-hint" id="refiner-hint">Paint directly on the result</div>
+        </div>
+        <footer><span id="stroke-count">No corrections yet</span><span>Small islands and holes are fixed as a whole. Large edges stay local.</span></footer>
+      </section>
+
+      <div class="alpha-grid">
+        <article><header><span>Original</span></header><canvas id="original-canvas"></canvas></article>
+        <article><header><span>Cutout</span><button data-download="cutout">PNG</button></header><canvas id="cutout-canvas"></canvas></article>
+        <article><header><span>Background check</span><button data-download="composite">PNG</button></header><canvas id="composite-canvas"></canvas></article>
+        <article><header><span>Alpha matte</span><button data-download="alpha">PNG</button></header><canvas id="alpha-canvas"></canvas></article>
+      </div>
+
+      <div class="alpha-note"><strong>Check the edge:</strong><span>Switch between black, white and pink. Paint green over anything that is missing. Mark unwanted leftovers in red.</span></div>
+    </section>
+
+    <section class="how-it-works" id="how-it-works">
+      <header><span>WHY PICORN</span><h2>A small model, plus image-aware correction.</h2></header>
+      <div>
+        <article><b>01</b><h3>One compact alpha model</h3><p>A 313k-parameter ONNX graph predicts a soft foreground matte instead of a hard cutout.</p></article>
+        <article><b>02</b><h3>Entropy-aware edges</h3><p>Local color, gradients and Shannon entropy help distinguish real detail from background texture.</p></article>
+        <article><b>03</b><h3>Hints that understand regions</h3><p>The refine brush builds a local trimap, grows through connected pixels and keeps changes inside a controlled band.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div><span class="brand-mark">P</span><p><b>PICORN Remove Background</b><br>Private by architecture. Small enough for the client.</p></div>
+    <p>WebGPU when available · WASM fallback · PNG export<br><a href="https://github.com/cueqzapper/PICORN-Background-Remover">Source and model on GitHub ↗</a></p>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
