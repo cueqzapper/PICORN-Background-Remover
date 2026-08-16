@@ -16,7 +16,7 @@ model, inference runtime, alpha correction and PNG export all run in the browser
 
 ![PICORN Remove Background browser demo](docs/demo.png)
 
-The shipped ONNX model is **1.35 MB** and has **312,878 inference parameters**.
+The shipped V9 ONNX model is **1.35 MB** and has **312,878 inference parameters**.
 It uses WebGPU when the browser supports it and falls back to WASM on the CPU.
 
 ## What you can do
@@ -37,6 +37,24 @@ detail path. It predicts a soft alpha matte, not just a binary object mask.
 
 The result is one model file with 988 ONNX nodes and 146 initializers. There is
 no Python service behind the demo.
+
+## V9 model update
+
+V9 improves the matte without adding layers, parameters or browser code. It is
+the same compact graph, fine-tuned once more at a low learning rate.
+
+On the full 6,489-image validation set (DIS5K, DUTS-TE and P3M):
+
+| Metric | V8 | V9 |
+| --- | ---: | ---: |
+| Intersection over Union | 0.59233 | **0.59294** |
+| Mean absolute error | 0.07515 | **0.07449** |
+| Boundary F1 | 0.38206 | **0.38432** |
+
+The update is deliberately small. V9 improves the aggregate score, edges and
+alpha error while keeping the 1,417,388-byte artifact unchanged. See the
+[V9 research notes](docs/model-v9.md) for the per-dataset results and rejected
+experiments.
 
 ## How the refine brush works
 

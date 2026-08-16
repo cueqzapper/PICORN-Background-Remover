@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import {
   applyStrokesToGuidance,
   applyHintMasksToGuidance,
@@ -9,6 +11,18 @@ import {
   smartStrokeHintMasks,
   strokeHintMasks,
 } from "../src/browser-runtime.js";
+
+test("the demo ships the versioned PICORN V9 model", async () => {
+  const model = await readFile(new URL(
+    "../public/models/picorn-remove-background-v9.onnx",
+    import.meta.url,
+  ));
+  assert.equal(model.byteLength, 1_417_388);
+  assert.equal(
+    createHash("sha256").update(model).digest("hex"),
+    "fb2d32ee2c07c9b7bc8f2adc2b5947d11c901c4bb2a8f1d23859c5107bc01295",
+  );
+});
 
 test("letterbox geometry matches the Python preprocessing", () => {
   assert.deepEqual(letterboxGeometry(1000, 500, 320), {

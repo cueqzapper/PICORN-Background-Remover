@@ -3,8 +3,8 @@ import {
   guidedRefineHints,
 } from "./interactive-matting.js";
 
-const MODEL_PATH = "models/picorn-remove-background-v8.onnx";
-const MODEL_CACHE = "picorn-remove-background-v8-20260808";
+const MODEL_PATH = "models/picorn-remove-background-v9.onnx";
+const MODEL_CACHE = "picorn-remove-background-v9-20260816";
 
 function assetUrl(path) {
   const base = import.meta.env?.BASE_URL || "./";
