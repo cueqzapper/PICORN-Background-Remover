@@ -70,7 +70,7 @@
     <section class="alpha-result" id="result-content" hidden>
       <header>
         <div><span>CURRENT IMAGE</span><h2 id="result-name">–</h2><p id="result-meta">–</p></div>
-        <div class="alpha-stats"><span>Model <b id="base-time">–</b></span><span>Profile <b id="detail-time">–</b></span><span>Parameters <b id="tile-count">–</b></span></div>
+        <div class="alpha-stats"><span>Model + edge <b id="base-time">–</b></span><span>Profile <b id="detail-time">–</b></span><span>Parameters <b id="tile-count">–</b></span></div>
       </header>
 
       <div class="background-picker">
@@ -118,7 +118,7 @@
       <header><span>WHY PICORN</span><h2>A small model, plus image-aware correction.</h2></header>
       <div>
         <article><b>01</b><h3>One compact alpha model</h3><p>A 313k-parameter ONNX graph predicts a soft foreground matte instead of a hard cutout.</p></article>
-        <article><b>02</b><h3>Entropy-aware edges</h3><p>Local color, gradients and Shannon entropy help distinguish real detail from background texture.</p></article>
+        <article><b>02</b><h3>Edges that follow the image</h3><p>Eight small WebGPU passes follow similar colours. A guided pass cleans the alpha without erasing hair, wires or small holes.</p></article>
         <article><b>03</b><h3>Hints that understand regions</h3><p>The refine brush builds a local trimap, grows through connected pixels and keeps changes inside a controlled band.</p></article>
       </div>
     </section>

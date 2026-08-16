@@ -110,8 +110,9 @@ function showResult(result, guided = false) {
   $("#result-content").hidden = false;
   $("#result-name").textContent = state.name;
   $("#result-meta").textContent = `${state.source.naturalWidth} × ${state.source.naturalHeight} px · processed locally${guided ? " · guided correction" : ""}`;
-  $("#base-time").textContent = `${format(result.modelMilliseconds)} ms`;
-  $("#detail-time").textContent = `${PROFILES[result.geometry.size]} · ${result.geometry.size} · ${result.backend}`;
+  const totalMilliseconds = result.modelMilliseconds + result.postprocessMilliseconds;
+  $("#base-time").textContent = `${format(totalMilliseconds)} ms`;
+  $("#detail-time").textContent = `${PROFILES[result.geometry.size]} · ${result.geometry.size} · ${result.backend} · ${result.refinementBackend} edge`;
   $("#tile-count").textContent = "313k";
   render();
   setBusy(false);

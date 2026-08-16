@@ -17,7 +17,8 @@ model, inference runtime, alpha correction and PNG export all run in the browser
 ![PICORN Remove Background browser demo](docs/demo.png)
 
 The shipped V9 ONNX model is **1.35 MB** and has **312,878 inference parameters**.
-It uses WebGPU when the browser supports it and falls back to WASM on the CPU.
+V10 keeps that model unchanged and adds a deterministic edge stage. It uses
+WebGPU when the browser supports it and falls back to CPU code plus WASM.
 
 ## What you can do
 
@@ -38,6 +39,38 @@ detail path. It predicts a soft alpha matte, not just a binary object mask.
 The result is one model file with 988 ONNX nodes and 146 initializers. There is
 no Python service behind the demo.
 
+## V10 hybrid edge update
+
+V10 separates two jobs that do not need the same tool:
+
+1. The compact neural model decides what the foreground object is and produces
+   a soft alpha matte.
+2. Eight four-neighbour WebGPU passes propagate only uncertain alpha values
+   between pixels with similar RGB values.
+3. A quarter-resolution fast guided filter places the soft transition back on
+   the full-resolution image edge.
+4. Confident alpha anchors, the foreground/background class boundary and thin
+   structures without a nearby safe core are protected.
+
+The refiner has no learned weights and does not change the 1,417,388-byte ONNX
+artifact. Chromium uses WGSL compute shaders; other browsers run the same
+deterministic CPU reference implementation.
+
+On the complete 6,489-image validation set:
+
+| Metric | V9 model | V10 hybrid | Change |
+| --- | ---: | ---: | ---: |
+| Intersection over Union | 0.59294 | **0.59412** | +0.00118 |
+| Mean absolute error | 0.07449 | **0.07423** | -0.00026 |
+| Mean squared error | 0.05174 | **0.05135** | -0.00040 |
+| Boundary F1 | 0.38432 | **0.39194** | +0.00762 |
+
+The improvement is positive on DIS5K, DUTS-TE and P3M-10K individually. A real
+Chrome WebGPU run matched the CPU reference within `1.2e-7`; at 512 px the warm
+edge stage averaged 11.25 ms on the validation workstation. See the
+[V10 research and benchmark notes](docs/hybrid-v10.md) for the paper trail,
+ablation results and limitations.
+
 ## V9 model update
 
 V9 improves the matte without adding layers, parameters or browser code. It is
@@ -51,7 +84,7 @@ On the full 6,489-image validation set (DIS5K, DUTS-TE and P3M):
 | Mean absolute error | 0.07515 | **0.07449** |
 | Boundary F1 | 0.38206 | **0.38432** |
 
-The update is deliberately small. V9 improves the aggregate score, edges and
+The model update is deliberately small. V9 improves the aggregate score, edges and
 alpha error while keeping the 1,417,388-byte artifact unchanged. See the
 [V9 research notes](docs/model-v9.md) for the per-dataset results and rejected
 experiments.
@@ -111,7 +144,9 @@ JSPI WebGPU runtime; older WebGPU implementations retain a compatible fallback.
 ```text
 public/models/                 PICORN ONNX model
 public/demo/                   CC0 demo images
-src/browser-runtime.js         ONNX loading, preprocessing and guidance inputs
+src/browser-runtime.js         ONNX loading, preprocessing and hybrid routing
+src/hybrid-refine-webgpu.js    WebGPU edge graph and guided alpha passes
+src/hybrid-refine.js           Deterministic CPU reference and fallback
 src/interactive-matting.js     Trimap, geodesic growth and guided refinement
 src/main.js                    Demo interaction, rendering and PNG export
 tests/                         Runtime and smart-refine regression tests

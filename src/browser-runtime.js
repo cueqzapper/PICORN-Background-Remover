@@ -2,6 +2,7 @@ import {
   geodesicTrimapCorrection,
   guidedRefineHints,
 } from "./interactive-matting.js";
+import { HybridAlphaRefiner } from "./hybrid-refine-webgpu.js";
 
 const MODEL_PATH = "models/picorn-remove-background-v9.onnx";
 const MODEL_CACHE = "picorn-remove-background-v9-20260816";
@@ -397,6 +398,9 @@ export class PicornBrowserRuntime {
     this.ort = null;
     this.backend = null;
     this.initializing = null;
+    this.hybridRefiner = new HybridAlphaRefiner({
+      onFallback: (error) => this.onProgress?.("refine-fallback", String(error)),
+    });
   }
 
   async initialize() {
@@ -472,9 +476,10 @@ export class PicornBrowserRuntime {
     const modelAlpha = new Float32Array(outputs.alpha.data);
     Object.values(feeds).forEach((tensor) => tensor.dispose?.());
     outputs.alpha.dispose?.();
+    let hybrid = null;
     const rawAlpha = baseAlpha && strokes.length
       ? mergeGuidedAlpha(baseAlpha, modelAlpha, hints)
-      : modelAlpha;
+      : (hybrid = await this.hybridRefiner.refine(data, modelAlpha, size)).alpha;
     const cropped = cropAlpha(rawAlpha, geometry);
     return {
       rawAlpha,
@@ -482,7 +487,10 @@ export class PicornBrowserRuntime {
       geometry,
       modelMilliseconds,
       preprocessMilliseconds,
+      postprocessMilliseconds: hybrid?.milliseconds || 0,
       backend: this.backend,
+      refinementBackend: hybrid?.backend || "interactive",
+      refinementVersion: hybrid?.version || null,
       guided: strokes.length > 0,
       smartSelection: hints.diagnostics || [],
     };
