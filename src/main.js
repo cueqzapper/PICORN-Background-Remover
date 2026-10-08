@@ -4,6 +4,9 @@ import {
   cropAlpha,
 } from "./browser-runtime.js";
 
+import { whiteGraphicCanvases } from './white-graphic.js';
+import { decontaminateForeground } from './foreground.js';
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const PROFILES = { 320: "Turbo", 384: "Balanced", 512: "Quality" };
@@ -43,17 +46,19 @@ async function imageFrom(source) {
 }
 
 function runtimeProgress(step, detail) {
+  // The edge refiner fell back from WebGPU to the CPU: the model is ready.
+  if (step === "refine-fallback") return;
   const pill = $("#runtime-pill");
   pill.className = "runtime-pill loading";
   const messages = {
     runtime: `Preparing ${detail} …`,
-    download: "Downloading the 1.35 MB model once …",
+    download: "Downloading the 1.2 MB model once …",
     cached: "Opening the model from browser cache …",
     fallback: "WebGPU unavailable · starting WASM …",
   };
   if (step === "ready") {
     pill.className = "runtime-pill ready";
-    $("#runtime-text").textContent = `Client-side · ${detail} · 1.35 MB · 313k parameters`;
+    $("#runtime-text").textContent = `Client-side · ${detail} · 1.2 MB · 524k parameters`;
   } else {
     $("#runtime-text").textContent = messages[step] || "Loading the browser model …";
   }
@@ -100,8 +105,13 @@ async function loadBlob(blob, name) {
   await runBase();
 }
 
-function setProbability(cropped, geometry) {
+function setProbability(cropped, geometry, guided = false) {
+  const started = performance.now();
   state.probability = alphaCanvas(cropped, geometry.resizedWidth, geometry.resizedHeight);
+  const graphic = guided ? null : whiteGraphicCanvases(state.source, state.probability);
+  state.graphic = graphic;
+  if (graphic) state.probability = graphic.matte;
+  state.graphicMilliseconds = performance.now() - started;
 }
 
 function showResult(result, guided = false) {
@@ -110,10 +120,10 @@ function showResult(result, guided = false) {
   $("#result-content").hidden = false;
   $("#result-name").textContent = state.name;
   $("#result-meta").textContent = `${state.source.naturalWidth} × ${state.source.naturalHeight} px · processed locally${guided ? " · guided correction" : ""}`;
-  const totalMilliseconds = result.modelMilliseconds + result.postprocessMilliseconds;
+  const totalMilliseconds = result.modelMilliseconds + result.postprocessMilliseconds + state.graphicMilliseconds;
   $("#base-time").textContent = `${format(totalMilliseconds)} ms`;
   $("#detail-time").textContent = `${PROFILES[result.geometry.size]} · ${result.geometry.size} · ${result.backend} · ${result.refinementBackend} edge`;
-  $("#tile-count").textContent = "313k";
+  $("#tile-count").textContent = "524k";
   render();
   setBusy(false);
 }
@@ -123,9 +133,28 @@ async function runBase() {
   resetStrokes();
   setBusy(true, "PICORN is reading the edge …");
   try {
-    const result = await runtime.infer(state.source, currentSize());
+    const result = await runtime.inferAutomatic(state.source, currentSize());
     state.baseAlpha = result.rawAlpha;
-    setProbability(result.cropped, result.geometry);
+    // The zoomed second pass is a sharper matte of the whole image; brush
+    // corrections keep working on the first pass's inference grid.
+    if (result.zoomed) {
+      setProbability(result.zoomed.alpha, { resizedWidth: result.zoomed.width, resizedHeight: result.zoomed.height });
+    } else {
+      setProbability(result.cropped, result.geometry);
+    }
+    if (state.graphic) {
+      // Subsequent brush edits start from the corrected automatic mask.
+      const work = document.createElement('canvas');
+      work.width = result.geometry.resizedWidth; work.height = result.geometry.resizedHeight;
+      const context = work.getContext('2d');
+      context.drawImage(state.probability, 0, 0, work.width, work.height);
+      const rgba = context.getImageData(0, 0, work.width, work.height).data;
+      state.baseAlpha = new Float32Array(result.rawAlpha);
+      for (let y = 0; y < work.height; y++) for (let x = 0; x < work.width; x++) {
+        state.baseAlpha[(y + result.geometry.top) * result.geometry.size + x + result.geometry.left]
+          = rgba[(y * work.width + x) * 4] / 255;
+      }
+    }
     showResult(result, false);
   } catch (error) {
     setBusy(false);
@@ -143,7 +172,7 @@ async function applyRefinement() {
   drawStrokes();
   try {
     const result = await runtime.infer(state.source, currentSize(), state.baseAlpha, state.strokes);
-    setProbability(result.cropped, result.geometry);
+    setProbability(result.cropped, result.geometry, true);
     showResult(result, true);
     const selected = result.smartSelection?.at(-1)?.selectedCells || 0;
     toast(selected ? "Edge and alpha rebuilt." : "Mask rebuilt locally.");
@@ -250,6 +279,12 @@ function render() {
   const originalContext = canvases[0].getContext("2d", { willReadFrequently: true });
   originalContext.drawImage(state.source, 0, 0, width, height);
   const original = originalContext.getImageData(0, 0, width, height);
+  if (state.graphic) {
+    const work = document.createElement('canvas'); work.width = width; work.height = height;
+    const ctx = work.getContext('2d');
+    ctx.drawImage(state.graphic.foreground, 0, 0, width, height);
+    original.data.set(ctx.getImageData(0, 0, width, height).data);
+  }
   const alpha = alphaValues(width, height);
   const cutoutContext = canvases[1].getContext("2d");
   cutoutContext.clearRect(0, 0, width, height);
@@ -405,8 +440,28 @@ async function download(kind) {
   context.imageSmoothingQuality = "high";
   if (kind === "alpha") {
     context.drawImage(exportMask(true), 0, 0, output.width, output.height);
-  } else {
+  } else if (!state.graphic) {
+    // Photos: write alpha directly and estimate the true edge colour.
     context.drawImage(state.source, 0, 0, output.width, output.height);
+    const image = context.getImageData(0, 0, output.width, output.height);
+    const maskCanvas = document.createElement("canvas");
+    maskCanvas.width = output.width;
+    maskCanvas.height = output.height;
+    const maskContext = maskCanvas.getContext("2d", { willReadFrequently: true });
+    maskContext.imageSmoothingEnabled = true;
+    maskContext.imageSmoothingQuality = "high";
+    maskContext.drawImage(exportMask(false), 0, 0, output.width, output.height);
+    const maskPixels = maskContext.getImageData(0, 0, output.width, output.height).data;
+    const alpha = Float32Array.from({ length: output.width * output.height }, (_, p) => maskPixels[p * 4 + 3] / 255);
+    decontaminateForeground(image.data, alpha, output.width, output.height);
+    context.putImageData(image, 0, 0);
+    if (kind === "composite") {
+      context.globalCompositeOperation = "destination-over";
+      paintBackground(context, output.width, output.height);
+      context.globalCompositeOperation = "source-over";
+    }
+  } else {
+    context.drawImage(state.graphic.foreground, 0, 0, output.width, output.height);
     context.globalCompositeOperation = "destination-in";
     context.drawImage(exportMask(false), 0, 0, output.width, output.height);
     if (kind === "composite") {

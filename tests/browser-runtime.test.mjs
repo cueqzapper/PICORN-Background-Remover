@@ -12,15 +12,15 @@ import {
   strokeHintMasks,
 } from "../src/browser-runtime.js";
 
-test("the demo ships the versioned PICORN V9 model", async () => {
+test("the demo ships the versioned PICORN V12 model", async () => {
   const model = await readFile(new URL(
-    "../public/models/picorn-remove-background-v9.onnx",
+    "../public/models/picorn-remove-background-v12.onnx",
     import.meta.url,
   ));
-  assert.equal(model.byteLength, 1_417_388);
+  assert.equal(model.byteLength, 1_209_207);
   assert.equal(
     createHash("sha256").update(model).digest("hex"),
-    "fb2d32ee2c07c9b7bc8f2adc2b5947d11c901c4bb2a8f1d23859c5107bc01295",
+    "119203edd80c2907e5c8c81967b1c594fb44b1a9a9ed969d7fb57fa97dc6ce91",
   );
 });
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#080a0d">
-  <meta name="description" content="PICORN Remove Background runs a 1.35 MB image matting model entirely in your browser, with local smart-brush refinement.">
+  <meta name="description" content="PICORN Remove Background runs a 1.2 MB image matting model entirely in your browser, with local smart-brush refinement.">
   <meta property="og:title" content="PICORN Remove Background">
   <meta property="og:description" content="Background remover in the Browser/Client side. No upload. WebGPU and WASM.">
   <meta property="og:type" content="website">
@@ -29,10 +29,10 @@
       <div>
         <p class="eyebrow">BACKGROUND REMOVER IN THE BROWSER/CLIENT SIDE.</p>
         <h1>Drop the background.<br><em>Keep the edge.</em></h1>
-        <p class="hero-copy">PICORN runs a 1.35 MB alpha-matting model on your device. No image upload, no API key, no waiting for a server. Correct tricky areas with one green or red stroke.</p>
+        <p class="hero-copy">PICORN runs a 1.2 MB alpha-matting model on your device. No image upload, no API key, no waiting for a server. Correct tricky areas with one green or red stroke.</p>
         <div class="hero-badges" aria-label="Product facts">
-          <span><b>1.35 MB</b> model</span>
-          <span><b>313k</b> parameters</span>
+          <span><b>1.2 MB</b> model</span>
+          <span><b>524k</b> parameters</span>
           <span><b>100%</b> local</span>
         </div>
       </div>
@@ -117,7 +117,7 @@
     <section class="how-it-works" id="how-it-works">
       <header><span>WHY PICORN</span><h2>A small model, plus image-aware correction.</h2></header>
       <div>
-        <article><b>01</b><h3>One compact alpha model</h3><p>A 313k-parameter ONNX graph predicts a soft foreground matte instead of a hard cutout.</p></article>
+        <article><b>01</b><h3>One compact alpha model</h3><p>A 524k-parameter ONNX graph predicts a soft foreground matte instead of a hard cutout.</p></article>
         <article><b>02</b><h3>Edges that follow the image</h3><p>Eight small WebGPU passes follow similar colours. A guided pass cleans the alpha without erasing hair, wires or small holes.</p></article>
         <article><b>03</b><h3>Hints that understand regions</h3><p>The refine brush builds a local trimap, grows through connected pixels and keeps changes inside a controlled band.</p></article>
       </div>

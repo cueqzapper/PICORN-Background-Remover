@@ -16,9 +16,26 @@ model, inference runtime, alpha correction and PNG export all run in the browser
 
 ![PICORN Remove Background browser demo](docs/demo.png)
 
-The shipped V9 ONNX model is **1.35 MB** and has **312,878 inference parameters**.
-V10 keeps that model unchanged and adds a deterministic edge stage. It uses
-WebGPU when the browser supports it and falls back to CPU code plus WASM.
+The V12 ONNX model is **1.2 MB** (1,209,207 bytes) and has **524,198
+inference parameters**. It keeps the V10 hybrid edge stage and the
+white-graphic refinement, and adds a zoomed second pass, confident-alpha
+snapping and foreground colour estimation. Inference uses WebGPU when
+supported, with a WASM fallback. See the [V12 notes](docs/model-v12.md).
+
+## V12 model update
+
+V12 swaps the from-scratch encoder for an ImageNet-pretrained
+MobileNetV4-Small-050 and keeps the V11 decoder. Weights are stored as FP16 and
+cast to FP32 at load, so the file is smaller than V11 while all arithmetic stays
+FP32. On the original 6,489-image holdout at 512 px:
+
+| Metric | V11 | V12 |
+| --- | ---: | ---: |
+| Intersection over Union | 0.617 | **0.773** |
+| Mean absolute alpha error | 0.073 | **0.036** |
+| Boundary F1 | 0.395 | **0.596** |
+| Model file | 1,417,525 B | **1,209,207 B** |
+| CPU, 512 px, 4 threads | 77.0 ms | **76.7 ms** |
 
 ## What you can do
 
@@ -36,7 +53,7 @@ ONNX graph combines a compact semantic encoder with dynamic foreground and
 background prototypes, multi-scale texture signals and a shallow full-resolution
 detail path. It predicts a soft alpha matte, not just a binary object mask.
 
-The result is one model file with 988 ONNX nodes and 146 initializers. There is
+The result is one model file with 990 ONNX nodes and 146 initializers. There is
 no Python service behind the demo.
 
 ## V10 hybrid edge update
